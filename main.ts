@@ -11,7 +11,7 @@
 // directory ($MAKEFUN_OUTPUT_DIR, default /output). No trailing newline,
 // no variation selector, no extra characters of any kind.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ENTRY = "🫂";
@@ -27,6 +27,23 @@ if (ENTRY.trim().length === 0) {
   throw new Error("entry must not be only white space");
 }
 
+// The brief asks for a single emoji: assert the text is exactly one
+// grapheme cluster, so no ZWJ chain or paired symbols can slip in as
+// several emoji wearing one coat.
+const graphemes = [...new Intl.Segmenter().segment(ENTRY)];
+if (graphemes.length !== 1) {
+  throw new Error(`entry must be a single emoji, got ${graphemes.length} grapheme clusters`);
+}
+
 const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "entry.txt"), ENTRY, "utf8");
+const outPath = join(outDir, "entry.txt");
+writeFileSync(outPath, ENTRY, "utf8");
+
+// Read the file back and refuse to finish if it is not byte-identical
+// to the entry: a stray newline or re-encoding would change the text
+// the judge sees.
+const written = readFileSync(outPath);
+if (!written.equals(Buffer.from(ENTRY, "utf8"))) {
+  throw new Error("written entry.txt is not byte-identical to the entry");
+}
